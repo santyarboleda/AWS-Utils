@@ -1,45 +1,44 @@
-import boto3
+import sagemaker, boto3, os, io, zipfile
 import pandas as pd
-import io
-import sys
-import os
-from smart_open import smart_open
 
-BUCKET_NAME = 'raw-011-nutresadatalake-std'
-PATH = 'laft/clientes/sapbw/ventas/'
-FILE = 'GEO_CLIENTES_ZDNA_30012020_.csv'
-
-class utils:
+class Boto3Utils:
     def __init__(self):
         pass
-
-    def read_s3_file_resource(self, FILE, PATH, BUCKET_NAME):
+    
+    def read_s3_csv_file_resource(self, FILE, PATH, BUCKET_NAME):
+        '''
+        Function to read csv file from S3 file
+        '''
         s3 = boto3.resource('s3')
         file_metadata = s3.Bucket(BUCKET_NAME).Object(PATH + FILE).get()
         flat_file = io.StringIO(file_metadata.get('Body').read().decode('latin-1'))
-        df = pd.read_csv(flat_file, sep=';')
-        return df
-        
-    # def s3_to_pandas(self, client, bucket, key, header=None):
-
-    #     # get key using boto3 client
-    #     obj = client.get_object(Bucket=bucket, Key=key)
-    #     gz = gzip.GzipFile(fileobj=obj['Body'])
-        
-    #     # load stream directly to DF
-    #     return pd.read_csv(gz, header=header, dtype=str)
-        
-    # def s3_to_pandas_with_processing(self, client, bucket, key, header=None):
+        return pd.read_csv(flat_file, sep = ';', error_bad_lines=True, encoding='latin-1')
     
-    #     # get key using boto3 client
-    #     obj = client.get_object(Bucket=bucket, Key=key)
-    #     gz = gzip.GzipFile(fileobj=obj['Body'])
+    def read_s3_csv_ext_zip_file_resource(self, FILE, PATH, BUCKET_NAME):
+        '''
+        Function to extract zip file content from S3 file 
+        '''
+        s3 = boto3.resource('s3')
+        file_metadata = s3.Bucket(BUCKET_NAME).Object(PATH + FILE).get()
+        file_metadata = io.BytesIO(file_metadata["Body"].read())
+        with zipfile.ZipFile(file_metadata, mode='r') as zipf:
+            zipf.extractall()
+        return pd.read_csv(zipf.namelist()[0], sep = ';', error_bad_lines=True, encoding='latin-1')
     
-    #     # replace some characters in incomming stream and load it to DF
-    #     lines = "\n".join([line.replace('?', ' ') for line in gz.read().decode('utf-8').split('\n')])
-    #     return pd.read_csv(io.StringIO(lines), header=None, dtype=str)
-
-if __name__ == '__main__':
-    utl = utils()
-    df = utl.read_s3_file_resource(FILE, PATH, BUCKET_NAME)
-    print(df.head())
+    def read_s3_csv_gz_file_resource(self, FILE, PATH, BUCKET_NAME):
+        '''
+        Function to read gz file from S3 file
+        '''
+        s3 = boto3.resource('s3')
+        file_metadata = s3.Bucket(BUCKET_NAME).Object(PATH + FILE).get()
+        file_metadata = io.BytesIO(file_metadata["Body"].read())
+        return pd.read_csv(file_metadata, compression='gzip', header=0, sep=';', error_bad_lines = False, encoding='latin-1', low_memory=False)
+    
+    def read_s3_csv_zip_file_resource(self, FILE, PATH, BUCKET_NAME):
+        '''
+        Function to read zip file content from S3 file
+        '''
+        s3 = boto3.resource('s3')
+        file_metadata = s3.Bucket(BUCKET_NAME).Object(PATH + FILE).get()
+        file_metadata = io.BytesIO(file_metadata["Body"].read())
+        return pd.read_csv(file_metadata, compression='zip', header=0, sep=';', error_bad_lines = False, encoding='latin-1')
